@@ -22,6 +22,15 @@ def main():
     # Server mode arguments
     parser.add_argument("--host", help="Host for the server (server mode)", default="0.0.0.0")
     parser.add_argument("--port", help="Port for the server (server mode)", type=int, default=8000)
+    parser.add_argument(
+        "--localtunnel",
+        action="store_true",
+        help="Expose server publicly through localtunnel (server mode)",
+    )
+    parser.add_argument(
+        "--localtunnel-subdomain",
+        help="Preferred localtunnel subdomain for a stable URL (server mode)",
+    )
     
     args = parser.parse_args()
     
@@ -39,6 +48,11 @@ def main():
             print("Error: AGENTARENA_API_KEY is required for server mode")
             print("Please set the AGENTARENA_API_KEY environment variable or add it to your .env file")
             sys.exit(1)
+
+        if args.localtunnel:
+            config.enable_localtunnel = True
+        if args.localtunnel_subdomain:
+            config.localtunnel_subdomain = args.localtunnel_subdomain
             
         start_server(host=args.host, port=args.port, config=config)
     elif args.mode == "local":

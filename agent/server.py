@@ -3,6 +3,9 @@ Server implementation for the AI agent.
 """
 import json
 import logging
+import shlex
+import subprocess
+import threading
 from typing import Optional
 import httpx
 import tempfile
@@ -343,6 +346,69 @@ async def health_check():
     """Health check endpoint."""
     return {"status": "healthy"}
 
+
+def _start_localtunnel(port: int, config: Settings) -> Optional[subprocess.Popen]:
+    """
+    Start localtunnel process for the given port.
+
+    Returns:
+        subprocess.Popen if started successfully, otherwise None.
+    """
+    cmd = shlex.split(config.localtunnel_command)
+    cmd.extend(["--port", str(port), "--host", config.localtunnel_host])
+    if config.localtunnel_subdomain:
+        cmd.extend(["--subdomain", config.localtunnel_subdomain])
+
+    try:
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+        )
+    except FileNotFoundError:
+        logger.error(
+            "Failed to start localtunnel: command not found (%s). "
+            "Install Node.js and localtunnel or set LOCALTUNNEL_COMMAND.",
+            config.localtunnel_command,
+        )
+        return None
+    except Exception as exc:
+        logger.error("Failed to start localtunnel: %s", str(exc), exc_info=True)
+        return None
+
+    def _stream_tunnel_logs():
+        if not process.stdout:
+            return
+        for line in process.stdout:
+            logger.info("[localtunnel] %s", line.strip())
+
+    threading.Thread(target=_stream_tunnel_logs, daemon=True).start()
+    logger.info("Started localtunnel process with command: %s", " ".join(cmd))
+    if config.localtunnel_subdomain:
+        logger.info(
+            "Requested fixed localtunnel URL: %s/%s",
+            config.localtunnel_host.rstrip("/"),
+            config.localtunnel_subdomain,
+        )
+    return process
+
+
+def _stop_localtunnel(process: Optional[subprocess.Popen]):
+    """Stop localtunnel process if it is still running."""
+    if not process:
+        return
+    if process.poll() is not None:
+        return
+
+    logger.info("Stopping localtunnel process")
+    process.terminate()
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        process.kill()
+
 def start_server(host: str, port: int, config: Settings):
     """
     Start the FastAPI server.
@@ -370,4 +436,11 @@ def start_server(host: str, port: int, config: Settings):
     
     # Start the server
     logger.info(f"Starting server on {host}:{port}")
-    uvicorn.run(app, host=host, port=port) 
+    tunnel_process = None
+    if config.enable_localtunnel:
+        tunnel_process = _start_localtunnel(port=port, config=config)
+
+    try:
+        uvicorn.run(app, host=host, port=port)
+    finally:
+        _stop_localtunnel(tunnel_process)
