@@ -48,24 +48,55 @@ LOG_FILE=agent.log
 
 ### Server Mode
 
-⚠️ **Warning** ⚠️ - The platform has not been released yet. For now, you can only test the agent locally.
-
 To run the agent in server mode you need to:
-1. Go to the [AgentArena website](https://app.agentarena.staging-nethermind.xyz/) and create a builder account.  
+
+1. Go to the [AgentArena website](https://agentarena.nethermind.io/) and create a builder account.
 2. Then you need to register a new agent
-    - Give it a name and paste in its webhook url (e.g. `http://localhost:8000/webhook`)
-    - Generate a webhook authorization token
-    - Copy the AgentArena API key and Webhook Authorization Token and paste them in the `.env` file.
-      ```
-      AGENTARENA_API_KEY=aa-...
-      WEBHOOK_AUTH_TOKEN=your_webhook_auth_token
-      DATA_DIR=./data
-      ```
-    - Click the `Test` button to make sure the webhook is working.
+   - Give it a name and paste in its webhook url (e.g. `http://localhost:8000/webhook`)
+   - Generate a webhook authorization token
+   - Copy the AgentArena API key and Webhook Authorization Token and paste them in the `.env` file.
+     ```
+     AGENTARENA_API_KEY=aa-...
+     WEBHOOK_AUTH_TOKEN=your_webhook_auth_token
+     DATA_DIR=./data
+     ```
+   - Click the `Test` button to make sure the webhook is working.
 3. Then you need to run the agent in server mode
-    ```bash
-    audit-agent server
-    ```
+   ```bash
+   audit-agent server
+   ```
+
+If you want a public webhook URL from your local machine, you can enable localtunnel.
+
+Set all required server env vars in `.env`:
+
+```bash
+# Required for server mode
+AGENTARENA_API_KEY=aa-...
+WEBHOOK_AUTH_TOKEN=your_webhook_auth_token
+DATA_DIR=./data
+
+# Optional for localtunnel
+ENABLE_LOCALTUNNEL=true
+LOCALTUNNEL_SUBDOMAIN=my-agent-audit
+LOCALTUNNEL_HOST=https://localtunnel.me
+LOCALTUNNEL_COMMAND=npx --yes localtunnel
+```
+
+Then run:
+
+```bash
+audit-agent server
+```
+
+Or run directly with CLI flags (useful in a startup script):
+
+```bash
+audit-agent server --localtunnel --localtunnel-subdomain my-agent-audit
+```
+
+This requests `https://my-agent-audit.localtunnel.me/webhook` as a stable URL.
+The subdomain is best-effort and may fail if already in use.
 
 By default, the agent will run on port 8000. To use a custom port, you can use the following command:
 
@@ -93,4 +124,4 @@ audit-agent --help
 
 ## License
 
-MIT 
+MIT
