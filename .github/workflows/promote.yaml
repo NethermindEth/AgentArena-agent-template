@@ -1,0 +1,39 @@
+name: Promote images
+run-name: "${{ github.actor }} promoted frontier-model-agent to prod"
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version tag for prod (e.g., v1.0.0)"
+        type: string
+        required: true
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  id-token: write
+  attestations: write
+  artifact-metadata: write
+  contents: read
+
+jobs:
+  promote:
+    name: Promote frontier-model-agent to prod
+    permissions:
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+      contents: read
+    uses: NethermindEth/github-workflows/.github/workflows/docker-promote-jfrog.yaml@3d867905630d4ccfab34368eed2114be37027a5f
+    with:
+      jfrog_url: "nethermind.jfrog.io"
+      image_name: "agentarena-frontier-model-agent"
+      group_name: "kyoto"
+      source_env: "staging"
+      target_env: "prod"
+      source_tag: "latest"
+      tags: "latest,${{ inputs.version }}"
+      skip_attest: false
