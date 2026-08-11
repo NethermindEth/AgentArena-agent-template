@@ -79,6 +79,80 @@ def _extract_json_report(report: str) -> str:
     return "\n".join(lines).strip()
 
 
+def _aggregated_per_file_descriptions(d: list | str) -> str:
+    """
+    Assembles all the descriptions together. They each tackle
+    a file. If this value is a string, return it as-is.
+    :param d: The vulnerability description, which is an array
+        or a string.
+    :return: The assembled description.
+    """
+
+    if isinstance(d, str):
+        return d
+    else:
+        texts = []
+        for item in d:
+            desc = item.get("desc")
+            file_ = item.get("file")
+            line_start, line_end = item.get("line_start"), item.get("line_end")
+
+            if not desc:
+                continue
+
+            full_desc = []
+            if file_:
+                file_desc = f"In file {file_}"
+                if line_start and line_end:
+                    file_desc += f", from line {line_start} to line {line_end}:"
+                elif line_start:
+                    file_desc += f", from line {line_start}:"
+                elif line_end:
+                    file_desc += f", up to line {line_end}:"
+                else:
+                    file_desc += ":"
+                full_desc.append(file_desc)
+
+            full_desc.append(desc)
+            texts.append("\n\n".join(full_desc))
+
+        return "\n\n".join(texts)
+
+
+def _description(v: dict) -> str:
+    """
+    Processes a description out of the vulnerability dictionary
+    that was generated from the underlying AI model.
+    :param v: The vulnerability dictionary.
+    :return: The description.
+    """
+
+    contents = []
+
+    # 1. If a summary is present, add it.
+    summary = v.get("summary")
+    if summary:
+        contents.append(summary)
+
+    # 2. Assemble the per-file description.
+    descriptions = v.get("description")
+    if descriptions:
+        contents.append(_aggregated_per_file_descriptions(descriptions))
+
+    # 3. Add impact, if present.
+    impact = v.get("impact")
+    if impact:
+        contents.append(f"Impact of this vulnerability: {impact}")
+
+    # 4. Add PoC, if present.
+    proof_of_concept = v.get("proof_of_concept")
+    if proof_of_concept:
+        contents.append(f"Proof of concept: {proof_of_concept}")
+
+    # Consider whether adding `remediation` makes sense or not.
+    return "\n\n".join(contents)
+
+
 def _audit_from_report(report_path: str) -> Audit:
     with open(report_path, "r", encoding="utf-8") as f:
         report = f.read().strip()
@@ -97,7 +171,7 @@ def _audit_from_report(report_path: str) -> Audit:
                 findings=[
                     VulnerabilityFinding(
                         title=vulnerability.get("title", "Untitled vulnerability"),
-                        description=json.dumps(vulnerability, indent=2),
+                        description=_description(vulnerability),
                         severity=str(vulnerability.get("severity", "info")).capitalize(),
                         file_paths=[
                             item["file"]
